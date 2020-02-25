@@ -6,6 +6,7 @@
 #include "linux_parser.h"
 
 using std::stoi;
+using std::stof;
 using std::string;
 using std::to_string;
 using std::vector;
@@ -71,6 +72,7 @@ vector<int> LinuxParser::Pids() {
 float LinuxParser::MemoryUtilization() {
   string line, key, value;
   long total, free;
+  float mem_util;
   std::ifstream stream(kProcDirectory + kMeminfoFilename);
   if (stream.is_open()) {
       while (std::getline(stream, line)) {
@@ -82,23 +84,26 @@ float LinuxParser::MemoryUtilization() {
               } else if (key == "MemFree:")
               {
                   free = stoi(value);
-                  break;
+                    if ((total > free) && (total > 0)) {
+                      mem_util = (total-free)/(total*1.0);
+                      return mem_util;
+                    }
               }
           }
-          break;
       }
   }
-    return (total-free)/total;
+
+  return mem_util;
 }
 
 // DONE: Read and return the system uptime
 long LinuxParser::UpTime() {
-    string line, uptime;
+    string line, uptime, temp;
     std::ifstream stream(kProcDirectory + kUptimeFilename);
     if(stream.is_open()){
         std::getline(stream, line);
         std::istringstream linestream(line);
-        linestream >> uptime;
+        linestream >> uptime >>temp;
     }
 
     return stoi(uptime);
@@ -113,13 +118,10 @@ int LinuxParser::TotalProcesses() {
         while (std::getline(stream, line)) {
           std::istringstream linestream(line);
 
-          while (linestream >> key >> value) {
-              if (key == "processes") {
-                processes = stoi(value);
-                break;
-              }
+          linestream >> key >> value;
+          if (key == "processes") {
+            processes = stoi(value);
           }
-          break;
         }
     }
     return processes;
@@ -134,13 +136,10 @@ int LinuxParser::RunningProcesses() {
         while (std::getline(stream, line)) {
           std::istringstream linestream(line);
 
-          while (linestream >> key >> value) {
+          linestream >> key >> value;
               if (key == "procs_running") {
                 processes_running = stoi(value);
-                break;
               }
-          }
-          break;
         }
     }
     return processes_running;
@@ -158,7 +157,6 @@ long LinuxParser::Jiffies() {
         linestream >> value;//discard the first cpu
         if (value == "cpu") {
             while (linestream >> value) {
-                linestream >> value;
                 cpu_stat.push_back(stoi(value));
             }
         }
@@ -199,7 +197,6 @@ long LinuxParser::ActiveJiffies() {
         linestream >> value;//discard the first cpu
         if (value == "cpu") {
             while (linestream >> value) {
-                linestream >> value;
                 cpu_stat.push_back(stoi(value));
             }
         }
@@ -218,7 +215,6 @@ long LinuxParser::IdleJiffies() {
         linestream >> value;//discard the first cpu
         if (value == "cpu") {
             while (linestream >> value) {
-                linestream >> value;
                 cpu_stat.push_back(stoi(value));
             }
         }
@@ -237,7 +233,6 @@ vector<string> LinuxParser::CpuUtilization() {
         linestream >> value;//discard the first cpu
         if (value == "cpu") {
             while (linestream >> value) {
-                linestream >> value;
                 cpu_stat.push_back(value);
             }
         }
@@ -265,13 +260,11 @@ string LinuxParser::Ram(int pid) {
         while (std::getline(stream, line)) {
           std::istringstream linestream(line);
 
-          while (linestream >> key >> value) {
-              if (key == "VmSize:") {
-                ram_value = stoi(value);
-                break;
-              }
+          linestream >> key >> value;
+          if (key == "VmSize:") {
+            ram_value = value;
+            return ram_value;
           }
-          break;
         }
     }
     return ram_value;
@@ -285,13 +278,11 @@ string LinuxParser::Uid(int pid) {
         while (std::getline(stream, line)) {
           std::istringstream linestream(line);
 
-          while (linestream >> key >> value) {
-              if (key == "Uid:") {
-                uid_string = stoi(value);
-                break;
-              }
+          linestream >> key >> value;
+          if (key == "Uid:") {
+            uid_string = value;
+            return uid_string;
           }
-          break;
         }
     }
     return uid_string;
@@ -304,15 +295,13 @@ string LinuxParser::User(int pid) {
     std::ifstream stream(kPasswordPath);
     if (stream.is_open()) {
         while (std::getline(stream, line)) {
-          std::istringstream linestream(line);
           std::replace(line.begin(), line.end(), ':', ' ');
-          while (linestream >> user >> x >> uid) {
-              if (uid == uid_string) {
-                username = user;
-                break;
-              }
+          std::istringstream linestream(line);
+          linestream >> user >> x >> uid;
+          if (uid == uid_string) {
+            username = user;
+            return username;
           }
-          break;
         }
     }
     return username;
