@@ -6,6 +6,7 @@
 #include "linux_parser.h"
 
 using std::stoi;
+using std::stol;
 using std::stof;
 using std::string;
 using std::to_string;
@@ -96,17 +97,18 @@ float LinuxParser::MemoryUtilization() {
   return mem_util;
 }
 
-// DONE: Read and return the system uptime
+// DONE: Read and return the system uptime, in seconds
 long LinuxParser::UpTime() {
-    string line, uptime, temp;
+    string line, uptime_str, temp_str;
+    long uptime;
     std::ifstream stream(kProcDirectory + kUptimeFilename);
     if(stream.is_open()){
         std::getline(stream, line);
         std::istringstream linestream(line);
-        linestream >> uptime >>temp;
+        linestream >> uptime_str >>temp_str;
     }
-
-    return stoi(uptime);
+    if (uptime_str != ""){uptime = stol(uptime_str);}
+    return uptime;
 }
 
 // DONE: Read and return the total number of processes
@@ -120,7 +122,7 @@ int LinuxParser::TotalProcesses() {
 
           linestream >> key >> value;
           if (key == "processes") {
-            processes = stoi(value);
+            processes = (value != "" ? stoi(value) : 0);
           }
         }
     }
@@ -138,7 +140,7 @@ int LinuxParser::RunningProcesses() {
 
           linestream >> key >> value;
               if (key == "procs_running") {
-                processes_running = stoi(value);
+                processes_running = (value != "" ? stoi(value) : 0);
               }
         }
     }
@@ -146,9 +148,10 @@ int LinuxParser::RunningProcesses() {
 }
 
 /* CPU related data */
-// Done: Read and return the number of jiffies for the system
+// Done: Read and return the total number of jiffies for the system
 long LinuxParser::Jiffies() {
     vector<long> cpu_stat;
+    long total;
     string line,value;
     std::ifstream stream(kProcDirectory + kStatFilename);
     if (stream.is_open()) {
@@ -157,11 +160,12 @@ long LinuxParser::Jiffies() {
         linestream >> value;//discard the first cpu
         if (value == "cpu") {
             while (linestream >> value) {
-                cpu_stat.push_back(stoi(value));
+                cpu_stat.push_back((value != "" ? stol(value) : 0));
             }
         }
     }
-    return  cpu_stat[kUser_]+cpu_stat[kNice_]+cpu_stat[kSystem_]+cpu_stat[kIdle_];
+    for (auto jiffy:cpu_stat){total += jiffy;}
+    return  total;
 }
 
 // Done: Read and return the number of active jiffies for a PID
@@ -169,6 +173,8 @@ long LinuxParser::ActiveJiffies(int pid) {
     string line, value;
     long utime;//#14 CPU time spent in user code, measured in clock ticks
     long stime;//#15 CPU time spent in kernel code, measured in clock ticks
+    long cutime;//#16 Amount of time that this process's waited-for children have been scheduled in user mode, measured in clock ticks
+    long cstime;//#17 Amount of time that this process's waited-for children have been scheduled in kernel mode, measured in clock ticks
     int counter = 14;
     std::ifstream stream(kProcDirectory + to_string(pid) + kStatFilename);
     if (stream.is_open()) {
@@ -179,11 +185,15 @@ long LinuxParser::ActiveJiffies(int pid) {
               linestream >> value;
               counter--;
           }
-          utime = stoi(value);
+          utime = (value != "" ? stol(value) : 0);
           linestream >> value;
-          stime = stoi(value);
+          stime = (value != "" ? stol(value) : 0);
+          linestream >> value;
+          cutime = (value != "" ? stol(value) : 0);
+          linestream >> value;
+          cstime = (value != "" ? stol(value) : 0);
     }
-    return utime + stime;
+    return utime + stime + cutime + cstime;
 }
 
 // Done: Read and return the number of active jiffies for the system
@@ -197,11 +207,11 @@ long LinuxParser::ActiveJiffies() {
         linestream >> value;//discard the first cpu
         if (value == "cpu") {
             while (linestream >> value) {
-                cpu_stat.push_back(stoi(value));
+                cpu_stat.push_back((value != "" ? stoi(value) : 0));
             }
         }
     }
-    return  cpu_stat[kUser_]+cpu_stat[kNice_]+cpu_stat[kSystem_];
+    return  cpu_stat[kUser_]+cpu_stat[kNice_]+cpu_stat[kSystem_]+cpu_stat[kIRQ_]+cpu_stat[kSoftIRQ_]+cpu_stat[kSteal_];
 }
 
 // Done: Read and return the number of idle jiffies for the system
@@ -215,11 +225,11 @@ long LinuxParser::IdleJiffies() {
         linestream >> value;//discard the first cpu
         if (value == "cpu") {
             while (linestream >> value) {
-                cpu_stat.push_back(stoi(value));
+                cpu_stat.push_back((value != "" ? stoi(value) : 0));
             }
         }
     }
-    return  cpu_stat[kIdle_];
+    return  cpu_stat[kIdle_]+cpu_stat[kIOwait_];
 }
 
 // Done: Read and return CPU utilization
@@ -307,7 +317,7 @@ string LinuxParser::User(int pid) {
     return username;
 }
 
-// DONE: Read and return the uptime of a process
+// DONE: Read and return the uptime of a process, in clock ticks
 long LinuxParser::UpTime(int pid) {
     string line, value;
     int counter = 22;
@@ -321,5 +331,5 @@ long LinuxParser::UpTime(int pid) {
               counter--;
           }
     }
-    return stoi(value);
+    return (value != "" ? stol(value) : 0);
 }
