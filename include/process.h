@@ -21,8 +21,9 @@ class Process {
   bool operator<(Process const& a) const;  // DONE: See src/process.cpp
 
  private:
-    int pid_;
-    float cpu_;
+    int pid_{0};
+    float cpu_util_{0};
+    int ram_{0};
 };
 
 #endif
